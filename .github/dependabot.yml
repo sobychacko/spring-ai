@@ -1,0 +1,108 @@
+version: 2
+updates:
+  # Parent POM in root directory
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
+  # Module 1
+  - package-ecosystem: "maven"
+    directory: "/vector-stores"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
+  - package-ecosystem: "maven"
+    directory: "/models"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
+  - package-ecosystem: "maven"
+    directory: "/mcp"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
+  - package-ecosystem: "maven"
+    directory: "/memory"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
+  - package-ecosystem: "maven"
+    directory: "/auto-configurations"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
+  - package-ecosystem: "maven"
+    directory: "/document-readers"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
+  - package-ecosystem: "maven"
+    directory: "/advisors"
+    schedule:
+      interval: "daily"
+    target-branch: "main"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "automated-pr"
+
