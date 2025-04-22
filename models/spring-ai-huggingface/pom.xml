@@ -51,7 +51,7 @@
 		<dependency>
 			<groupId>io.swagger.core.v3</groupId>
 			<artifactId>swagger-annotations</artifactId>
-			<version>2.2.15</version>
+			<version>2.2.30</version>
 		</dependency>
 
 		<dependency>
@@ -90,7 +90,7 @@
 			<plugin>
 				<groupId>io.swagger.codegen.v3</groupId>
 				<artifactId>swagger-codegen-maven-plugin</artifactId>
-				<version>3.0.64</version>
+				<version>3.0.68</version>
 				<executions>
 					<execution>
 						<goals>
@@ -121,7 +121,7 @@
 				<!-- a hint for IDE's to add the java sources to the classpath -->
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>build-helper-maven-plugin</artifactId>
-				<version>3.4.0</version>
+				<version>3.6.0</version>
 				<executions>
 					<execution>
 						<id>01-add-test-sources</id>
