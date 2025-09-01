@@ -406,7 +406,7 @@ class AnthropicChatModelIT {
 			.temperature(1.0) // temperature should be set to 1 when thinking is enabled
 			.maxTokens(8192)
 			.thinking(AnthropicApi.ThinkingType.ENABLED, 2048) // Must be ≥1024 && <
-																// max_tokens
+			// max_tokens
 			.build();
 
 		ChatResponse response = this.chatModel.call(new Prompt(List.of(userMessage), promptOptions));
@@ -438,7 +438,7 @@ class AnthropicChatModelIT {
 			.temperature(1.0) // Temperature should be set to 1 when thinking is enabled
 			.maxTokens(8192)
 			.thinking(AnthropicApi.ThinkingType.ENABLED, 2048) // Must be ≥1024 && <
-																// max_tokens
+			// max_tokens
 			.build();
 
 		Flux<ChatResponse> responseFlux = this.streamingChatModel
@@ -489,6 +489,59 @@ class AnthropicChatModelIT {
 				assertThat(toolCall.arguments()).isNotBlank();
 			}
 		}
+	}
+
+	@Test
+	void chatWithPromptCacheViaOptions() {
+		String userMessageText = "It could be eitherr a contraction of the full title Quenta Silmarillion (\"Tale of the Silmarils\") or also a plain Genitive which "
+				+ "(as in Ancient Greek) signifies reference. This genitive is translated in English with \"about\" or \"of\" "
+				+ "constructions; the titles of the chapters in The Silmarillion are examples of this genitive in poetic English "
+				+ "(Of the Sindar, Of Men, Of the Darkening of Valinor etc), where \"of\" means \"about\" or \"concerning\". "
+				+ "In the same way, Silmarillion can be taken to mean \"Of/About the Silmarils\"";
+
+		// Repeat content to meet minimum token requirements for caching (1024+ tokens)
+		String largeContent = userMessageText.repeat(20);
+
+		// First request - should create cache
+		ChatResponse firstResponse = this.chatModel.call(new Prompt(List.of(new UserMessage(largeContent)),
+				AnthropicChatOptions.builder()
+					.model(AnthropicApi.ChatModel.CLAUDE_3_HAIKU.getValue())
+					.cacheControlConfiguration(AnthropicChatOptions.CacheControlConfiguration.DEFAULT)
+					.maxTokens(100)
+					.temperature(0.8)
+					.build()));
+
+		// Access native Anthropic usage data
+		AnthropicApi.Usage firstUsage = (AnthropicApi.Usage) firstResponse.getMetadata().getUsage().getNativeUsage();
+
+		// Verify first request created cache
+		assertThat(firstUsage.cacheCreationInputTokens()).isGreaterThan(0);
+		assertThat(firstUsage.cacheReadInputTokens()).isEqualTo(0);
+
+		// Second request with identical content - should read from cache
+		ChatResponse secondResponse = this.chatModel.call(new Prompt(List.of(new UserMessage(largeContent)),
+				AnthropicChatOptions.builder()
+					.model(AnthropicApi.ChatModel.CLAUDE_3_HAIKU.getValue())
+					.cacheControlConfiguration(AnthropicChatOptions.CacheControlConfiguration.DEFAULT)
+					.maxTokens(100)
+					.temperature(0.8)
+					.build()));
+
+		// Access native Anthropic usage data
+		AnthropicApi.Usage secondUsage = (AnthropicApi.Usage) secondResponse.getMetadata().getUsage().getNativeUsage();
+
+		// Verify second request used cache
+		assertThat(secondUsage.cacheCreationInputTokens()).isEqualTo(0);
+		assertThat(secondUsage.cacheReadInputTokens()).isGreaterThan(0);
+
+		// Both responses should be valid
+		assertThat(firstResponse.getResult().getOutput().getText()).isNotBlank();
+		assertThat(secondResponse.getResult().getOutput().getText()).isNotBlank();
+
+		logger.info("First request - Cache creation: {}, Cache read: {}", firstUsage.cacheCreationInputTokens(),
+				firstUsage.cacheReadInputTokens());
+		logger.info("Second request - Cache creation: {}, Cache read: {}", secondUsage.cacheCreationInputTokens(),
+				secondUsage.cacheReadInputTokens());
 	}
 
 	record ActorsFilmsRecord(String actor, List<String> movies) {

@@ -22,6 +22,9 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import org.springframework.ai.anthropic.AnthropicChatOptions.CacheControlConfiguration;
+import org.springframework.ai.anthropic.api.AnthropicCacheType;
+import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.anthropic.api.AnthropicApi.ChatCompletionRequest.Metadata;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests for {@link AnthropicChatOptions}.
  *
  * @author Alexandros Pappas
+ * @author Soby Chacko
+ * @author Austin Dase
  */
 class AnthropicChatOptionsTests {
 
@@ -43,10 +48,14 @@ class AnthropicChatOptionsTests {
 			.topP(0.8)
 			.topK(50)
 			.metadata(new Metadata("userId_123"))
+			.cacheControlConfiguration(CacheControlConfiguration.DEFAULT)
 			.build();
 
-		assertThat(options).extracting("model", "maxTokens", "stopSequences", "temperature", "topP", "topK", "metadata")
-			.containsExactly("test-model", 100, List.of("stop1", "stop2"), 0.7, 0.8, 50, new Metadata("userId_123"));
+		assertThat(options)
+			.extracting("model", "maxTokens", "stopSequences", "temperature", "topP", "topK", "metadata",
+					"cacheControlConfiguration")
+			.containsExactly("test-model", 100, List.of("stop1", "stop2"), 0.7, 0.8, 50, new Metadata("userId_123"),
+					CacheControlConfiguration.DEFAULT);
 	}
 
 	@Test
@@ -60,6 +69,7 @@ class AnthropicChatOptionsTests {
 			.topK(50)
 			.metadata(new Metadata("userId_123"))
 			.toolContext(Map.of("key1", "value1"))
+			.cacheControlConfiguration(CacheControlConfiguration.builder().minCacheBlockLength(100).build())
 			.build();
 
 		AnthropicChatOptions copied = original.copy();
@@ -68,6 +78,7 @@ class AnthropicChatOptionsTests {
 		// Ensure deep copy
 		assertThat(copied.getStopSequences()).isNotSameAs(original.getStopSequences());
 		assertThat(copied.getToolContext()).isNotSameAs(original.getToolContext());
+		assertThat(copied.getCacheControlConfiguration()).isEqualTo(original.getCacheControlConfiguration());
 	}
 
 	@Test
@@ -80,6 +91,7 @@ class AnthropicChatOptionsTests {
 		options.setTopP(0.8);
 		options.setStopSequences(List.of("stop1", "stop2"));
 		options.setMetadata(new Metadata("userId_123"));
+		options.setCacheControlConfiguration(CacheControlConfiguration.DEFAULT);
 
 		assertThat(options.getModel()).isEqualTo("test-model");
 		assertThat(options.getMaxTokens()).isEqualTo(100);
@@ -88,6 +100,7 @@ class AnthropicChatOptionsTests {
 		assertThat(options.getTopP()).isEqualTo(0.8);
 		assertThat(options.getStopSequences()).isEqualTo(List.of("stop1", "stop2"));
 		assertThat(options.getMetadata()).isEqualTo(new Metadata("userId_123"));
+		assertThat(options.getCacheControlConfiguration()).isEqualTo(CacheControlConfiguration.DEFAULT);
 	}
 
 	@Test
@@ -100,6 +113,7 @@ class AnthropicChatOptionsTests {
 		assertThat(options.getTopP()).isNull();
 		assertThat(options.getStopSequences()).isNull();
 		assertThat(options.getMetadata()).isNull();
+		assertThat(options.getCacheControlConfiguration()).isNull();
 	}
 
 	@Test
@@ -133,6 +147,7 @@ class AnthropicChatOptionsTests {
 		assertThat(copiedOptions.getModel()).isNull();
 		assertThat(copiedOptions.getMaxTokens()).isNull();
 		assertThat(copiedOptions.getTemperature()).isNull();
+		assertThat(copiedOptions.getCacheControlConfiguration()).isNull();
 	}
 
 	@Test
@@ -199,6 +214,8 @@ class AnthropicChatOptionsTests {
 			.stopSequences(List.of("stop"))
 			.metadata(new Metadata("user_456"))
 			.toolContext(Map.of("context", "value"))
+			.cacheControlConfiguration(
+					CacheControlConfiguration.builder().minCacheBlockLength(50).maxCacheBlocks(10).build())
 			.build();
 
 		// Verify all chained methods worked
@@ -210,6 +227,9 @@ class AnthropicChatOptionsTests {
 		assertThat(options.getStopSequences()).containsExactly("stop");
 		assertThat(options.getMetadata()).isEqualTo(new Metadata("user_456"));
 		assertThat(options.getToolContext()).containsEntry("context", "value");
+		assertThat(options.getCacheControlConfiguration()).isNotNull();
+		assertThat(options.getCacheControlConfiguration().getMinCacheBlockLength()).isEqualTo(50);
+		assertThat(options.getCacheControlConfiguration().getMaxCacheBlocks()).isEqualTo(10);
 	}
 
 	@Test
@@ -224,6 +244,7 @@ class AnthropicChatOptionsTests {
 		options.setStopSequences(null);
 		options.setMetadata(null);
 		options.setToolContext(null);
+		options.setCacheControlConfiguration(null);
 
 		assertThat(options.getModel()).isNull();
 		assertThat(options.getMaxTokens()).isNull();
@@ -233,6 +254,7 @@ class AnthropicChatOptionsTests {
 		assertThat(options.getStopSequences()).isNull();
 		assertThat(options.getMetadata()).isNull();
 		assertThat(options.getToolContext()).isNull();
+		assertThat(options.getCacheControlConfiguration()).isNull();
 	}
 
 	@Test
@@ -299,6 +321,8 @@ class AnthropicChatOptionsTests {
 			.topK(60)
 			.metadata(new Metadata("comprehensive_test"))
 			.toolContext(Map.of("key1", "value1", "key2", "value2"))
+			.cacheControlConfiguration(
+					CacheControlConfiguration.builder().minCacheBlockLength(200).maxCacheBlocks(5).build())
 			.build();
 
 		AnthropicChatOptions copied = original.copy();
@@ -312,6 +336,7 @@ class AnthropicChatOptionsTests {
 		assertThat(copied.getTopK()).isEqualTo(original.getTopK());
 		assertThat(copied.getMetadata()).isEqualTo(original.getMetadata());
 		assertThat(copied.getToolContext()).isEqualTo(original.getToolContext());
+		assertThat(copied.getCacheControlConfiguration()).isEqualTo(original.getCacheControlConfiguration());
 
 		// Ensure deep copy for collections
 		assertThat(copied.getStopSequences()).isNotSameAs(original.getStopSequences());
@@ -469,6 +494,205 @@ class AnthropicChatOptionsTests {
 
 		assertThat(options.getModel()).isEqualTo("updated-model");
 		assertThat(options.getMaxTokens()).isEqualTo(10);
+	}
+
+	@Test
+	void testCacheControlConfigurationBuilder() {
+		CacheControlConfiguration config = CacheControlConfiguration.builder().build();
+
+		AnthropicChatOptions options = AnthropicChatOptions.builder()
+			.model("test-model")
+			.cacheControlConfiguration(config)
+			.build();
+
+		assertThat(options.getCacheControlConfiguration()).isEqualTo(config);
+		// Default max cache blocks is 4 per configuration defaults
+		assertThat(options.getCacheControlConfiguration().getMaxCacheBlocks()).isEqualTo(4);
+	}
+
+	@Test
+	void testCacheControlDefaultValue() {
+		AnthropicChatOptions options = new AnthropicChatOptions();
+		assertThat(options.getCacheControlConfiguration()).isNull();
+	}
+
+	@Test
+	void testCacheControlConfigurationEqualsAndHashCode() {
+		CacheControlConfiguration config = CacheControlConfiguration.builder().build();
+
+		AnthropicChatOptions options1 = AnthropicChatOptions.builder()
+			.model("test-model")
+			.cacheControlConfiguration(config)
+			.build();
+
+		AnthropicChatOptions options2 = AnthropicChatOptions.builder()
+			.model("test-model")
+			.cacheControlConfiguration(config)
+			.build();
+
+		AnthropicChatOptions options3 = AnthropicChatOptions.builder().model("test-model").build();
+
+		assertThat(options1).isEqualTo(options2);
+		assertThat(options1.hashCode()).isEqualTo(options2.hashCode());
+
+		assertThat(options1).isNotEqualTo(options3);
+		assertThat(options1.hashCode()).isNotEqualTo(options3.hashCode());
+	}
+
+	@Test
+	void testCacheControlConfigurationCopy() {
+		CacheControlConfiguration config = CacheControlConfiguration.builder().build();
+
+		AnthropicChatOptions original = AnthropicChatOptions.builder()
+			.model("test-model")
+			.cacheControlConfiguration(config)
+			.build();
+
+		AnthropicChatOptions copied = original.copy();
+
+		assertThat(copied).isNotSameAs(original).isEqualTo(original);
+		assertThat(copied.getCacheControlConfiguration()).isEqualTo(original.getCacheControlConfiguration());
+		// copy() preserves the same configuration instance
+		assertThat(copied.getCacheControlConfiguration()).isSameAs(config);
+	}
+
+	@Test
+	void testCacheControlConfigurationWithNullValue() {
+		AnthropicChatOptions options = AnthropicChatOptions.builder()
+			.model("test-model")
+			.cacheControlConfiguration(null)
+			.build();
+
+		assertThat(options.getCacheControlConfiguration()).isNull();
+	}
+
+	@Test
+	void testBuilderWithAllFieldsIncludingCacheControlConfiguration() {
+		CacheControlConfiguration config = CacheControlConfiguration.builder().build();
+
+		AnthropicChatOptions options = AnthropicChatOptions.builder()
+			.model("test-model")
+			.maxTokens(100)
+			.stopSequences(List.of("stop1", "stop2"))
+			.temperature(0.7)
+			.topP(0.8)
+			.topK(50)
+			.metadata(new Metadata("userId_123"))
+			.cacheControlConfiguration(config)
+			.build();
+
+		assertThat(options)
+			.extracting("model", "maxTokens", "stopSequences", "temperature", "topP", "topK", "metadata",
+					"cacheControlConfiguration")
+			.containsExactly("test-model", 100, List.of("stop1", "stop2"), 0.7, 0.8, 50, new Metadata("userId_123"),
+					config);
+	}
+
+	@Test
+	void testCacheControlConfigurationMutationDoesNotAffectOriginal() {
+		CacheControlConfiguration config = CacheControlConfiguration.builder().build();
+
+		AnthropicChatOptions original = AnthropicChatOptions.builder()
+			.model("original-model")
+			.cacheControlConfiguration(config)
+			.build();
+
+		AnthropicChatOptions copy = original.copy();
+		copy.setCacheControlConfiguration(null);
+
+		// Original should remain unchanged
+		assertThat(original.getCacheControlConfiguration()).isEqualTo(config);
+		// Copy should have null cache control configuration
+		assertThat(copy.getCacheControlConfiguration()).isNull();
+	}
+
+	@Test
+	void testCacheControlConfigurationDefaults() {
+		CacheControlConfiguration defaults = new CacheControlConfiguration();
+
+		assertThat(defaults.getMaxCacheBlocks()).isEqualTo(4);
+		assertThat(defaults.getMinCacheBlockLength()).isEqualTo(2000);
+		assertThat(defaults.getCachableMessageTypes()).containsExactlyInAnyOrder(MessageType.SYSTEM, MessageType.USER,
+				MessageType.ASSISTANT, MessageType.TOOL);
+		assertThat(defaults.getMessageTypeCacheTypes())
+			.containsEntry(MessageType.SYSTEM, AnthropicCacheType.EPHEMERAL_1H)
+			.containsEntry(MessageType.USER, AnthropicCacheType.EPHEMERAL)
+			.containsEntry(MessageType.ASSISTANT, AnthropicCacheType.EPHEMERAL)
+			.containsEntry(MessageType.TOOL, AnthropicCacheType.EPHEMERAL);
+
+		// Static DEFAULT matches a fresh instance by value
+		assertThat(CacheControlConfiguration.DEFAULT).isEqualTo(defaults);
+	}
+
+	@Test
+	void testCacheTypeLookupDefaultAndOverride() {
+		// Start from empty mapping then add specific override
+		CacheControlConfiguration config = CacheControlConfiguration.builder()
+			.messageTypeCacheTypes(null) // force builder to initialize map on demand
+			.addMessageTypeCacheType(MessageType.SYSTEM, AnthropicCacheType.EPHEMERAL_1H)
+			.build();
+
+		// Unmapped types default to EPHEMERAL
+		assertThat(config.getCacheTypeForMessageType(MessageType.USER)).isEqualTo(AnthropicCacheType.EPHEMERAL);
+		assertThat(config.getCacheTypeForMessageType(MessageType.ASSISTANT)).isEqualTo(AnthropicCacheType.EPHEMERAL);
+		assertThat(config.getCacheTypeForMessageType(MessageType.TOOL)).isEqualTo(AnthropicCacheType.EPHEMERAL);
+
+		// Mapped type returns configured value
+		assertThat(config.getCacheTypeForMessageType(MessageType.SYSTEM)).isEqualTo(AnthropicCacheType.EPHEMERAL_1H);
+	}
+
+	@Test
+	void testMinBlockLengthLookupDefaultAndOverride() {
+		CacheControlConfiguration config = CacheControlConfiguration.builder()
+			.minCacheBlockLength(3000)
+			.minBlockLengthForMessageType(MessageType.SYSTEM, 1500)
+			.build();
+
+		// Override applies for SYSTEM
+		assertThat(config.getMinBlockLengthForMessageType(MessageType.SYSTEM)).isEqualTo(1500);
+		// Others use global default
+		assertThat(config.getMinBlockLengthForMessageType(MessageType.USER)).isEqualTo(3000);
+		assertThat(config.getMinBlockLengthForMessageType(MessageType.ASSISTANT)).isEqualTo(3000);
+		assertThat(config.getMinBlockLengthForMessageType(MessageType.TOOL)).isEqualTo(3000);
+	}
+
+	@Test
+	void testBuilderAddersInitializeNullCollections() {
+		CacheControlConfiguration config = CacheControlConfiguration.builder()
+			.cachableMessageTypes(null)
+			.addCachableMessageType(MessageType.USER)
+			.messageTypeCacheTypes(null)
+			.addMessageTypeCacheType(MessageType.USER, AnthropicCacheType.EPHEMERAL)
+			.minBlockLengthForMessageType(MessageType.USER, 1234)
+			.build();
+
+		assertThat(config.getCachableMessageTypes()).contains(MessageType.USER);
+		assertThat(config.getMessageTypeCacheTypes()).containsEntry(MessageType.USER, AnthropicCacheType.EPHEMERAL);
+		assertThat(config.getMinBlockLengthForMessageType(MessageType.USER)).isEqualTo(1234);
+	}
+
+	@Test
+	void testCacheControlConfigurationEqualityAcrossInstances() {
+		CacheControlConfiguration c1 = CacheControlConfiguration.builder()
+			.maxCacheBlocks(2)
+			.minCacheBlockLength(1111)
+			.cachableMessageTypes(new java.util.HashSet<>(java.util.List.of(MessageType.USER, MessageType.SYSTEM)))
+			.messageTypeCacheTypes(java.util.Map.of(MessageType.SYSTEM, AnthropicCacheType.EPHEMERAL_1H))
+			.minBlockLengthForMessageType(MessageType.SYSTEM, 999)
+			.build();
+
+		CacheControlConfiguration c2 = CacheControlConfiguration.builder()
+			.maxCacheBlocks(2)
+			.minCacheBlockLength(1111)
+			.cachableMessageTypes(new java.util.HashSet<>(java.util.List.of(MessageType.SYSTEM, MessageType.USER))) // different
+																													// order
+			.messageTypeCacheTypes(
+					new java.util.HashMap<>(java.util.Map.of(MessageType.SYSTEM, AnthropicCacheType.EPHEMERAL_1H)))
+			.minBlockLengthForMessageType(MessageType.SYSTEM, 999)
+			.build();
+
+		assertThat(c1).isEqualTo(c2);
+		assertThat(c1.hashCode()).isEqualTo(c2.hashCode());
 	}
 
 }
