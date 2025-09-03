@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import org.springframework.ai.anthropic.api.AnthropicApi;
-import org.springframework.ai.anthropic.api.AnthropicCacheType;
 import org.springframework.ai.anthropic.api.tool.MockWeatherService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -407,7 +406,7 @@ class AnthropicChatModelIT {
 			.temperature(1.0) // temperature should be set to 1 when thinking is enabled
 			.maxTokens(8192)
 			.thinking(AnthropicApi.ThinkingType.ENABLED, 2048) // Must be ≥1024 && <
-																// max_tokens
+			// max_tokens
 			.build();
 
 		ChatResponse response = this.chatModel.call(new Prompt(List.of(userMessage), promptOptions));
@@ -439,7 +438,7 @@ class AnthropicChatModelIT {
 			.temperature(1.0) // Temperature should be set to 1 when thinking is enabled
 			.maxTokens(8192)
 			.thinking(AnthropicApi.ThinkingType.ENABLED, 2048) // Must be ≥1024 && <
-																// max_tokens
+			// max_tokens
 			.build();
 
 		Flux<ChatResponse> responseFlux = this.streamingChatModel
@@ -507,7 +506,7 @@ class AnthropicChatModelIT {
 		ChatResponse firstResponse = this.chatModel.call(new Prompt(List.of(new UserMessage(largeContent)),
 				AnthropicChatOptions.builder()
 					.model(AnthropicApi.ChatModel.CLAUDE_3_HAIKU.getValue())
-					.cacheControl(AnthropicCacheType.EPHEMERAL.cacheControl())
+					.cacheControlConfiguration(AnthropicChatOptions.CacheControlConfiguration.DEFAULT)
 					.maxTokens(100)
 					.temperature(0.8)
 					.build()));
@@ -523,7 +522,7 @@ class AnthropicChatModelIT {
 		ChatResponse secondResponse = this.chatModel.call(new Prompt(List.of(new UserMessage(largeContent)),
 				AnthropicChatOptions.builder()
 					.model(AnthropicApi.ChatModel.CLAUDE_3_HAIKU.getValue())
-					.cacheControl(AnthropicCacheType.EPHEMERAL.cacheControl())
+					.cacheControlConfiguration(AnthropicChatOptions.CacheControlConfiguration.DEFAULT)
 					.maxTokens(100)
 					.temperature(0.8)
 					.build()));

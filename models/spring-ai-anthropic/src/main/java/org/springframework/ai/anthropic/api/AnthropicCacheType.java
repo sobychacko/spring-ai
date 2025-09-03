@@ -32,13 +32,19 @@ import org.springframework.ai.anthropic.api.AnthropicApi.ChatCompletionRequest.C
  * Caching</a>
  * @author Claudio Silva Junior
  * @author Soby Chacko
+ * @author Austin Dase
  */
 public enum AnthropicCacheType {
 
 	/**
 	 * Ephemeral cache with 5-minute lifetime, refreshed on each use.
 	 */
-	EPHEMERAL(() -> new CacheControl("ephemeral"));
+	EPHEMERAL(() -> new CacheControl("ephemeral")),
+
+	/**
+	 * Ephemeral cache with 1-hour lifetime, refreshed on each use.
+	 */
+	EPHEMERAL_1H(() -> new CacheControl("ephemeral", "1h"));
 
 	private final Supplier<CacheControl> value;
 

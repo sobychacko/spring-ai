@@ -32,6 +32,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.anthropic.api.AnthropicApi.ChatCompletionRequest;
+import org.springframework.ai.anthropic.api.AnthropicCacheType;
+import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.lang.Nullable;
@@ -45,6 +47,7 @@ import org.springframework.util.Assert;
  * @author Alexandros Pappas
  * @author Ilayaperumal Gopinathan
  * @author Soby Chacko
+ * @author Austin Dase
  * @since 1.0.0
  */
 @JsonInclude(Include.NON_NULL)
@@ -59,20 +62,10 @@ public class AnthropicChatOptions implements ToolCallingChatOptions {
 	private @JsonProperty("top_p") Double topP;
 	private @JsonProperty("top_k") Integer topK;
 	private @JsonProperty("thinking") ChatCompletionRequest.ThinkingConfig thinking;
-
 	/**
-	 * Cache control for user messages. When set, enables caching for user messages.
-	 * Uses the existing CacheControl record from AnthropicApi.ChatCompletionRequest.
+	 * Cache control configuration options for the chat completion request.
 	 */
-	private @JsonProperty("cache_control") ChatCompletionRequest.CacheControl cacheControl;
-
-	public ChatCompletionRequest.CacheControl getCacheControl() {
-		return this.cacheControl;
-	}
-
-	public void setCacheControl(ChatCompletionRequest.CacheControl cacheControl) {
-		this.cacheControl = cacheControl;
-	}
+	private @JsonProperty("cache_control") CacheControlConfiguration cacheControlConfiguration;
 
 	/**
 	 * Collection of {@link ToolCallback}s to be used for tool calling in the chat
@@ -126,7 +119,7 @@ public class AnthropicChatOptions implements ToolCallingChatOptions {
 			.internalToolExecutionEnabled(fromOptions.getInternalToolExecutionEnabled())
 			.toolContext(fromOptions.getToolContext() != null ? new HashMap<>(fromOptions.getToolContext()) : null)
 			.httpHeaders(fromOptions.getHttpHeaders() != null ? new HashMap<>(fromOptions.getHttpHeaders()) : null)
-			.cacheControl(fromOptions.getCacheControl())
+			.cacheControlConfiguration(fromOptions.getCacheControlConfiguration())
 			.build();
 	}
 
@@ -275,6 +268,15 @@ public class AnthropicChatOptions implements ToolCallingChatOptions {
 		this.httpHeaders = httpHeaders;
 	}
 
+	@JsonIgnore
+	public CacheControlConfiguration getCacheControlConfiguration() {
+		return this.cacheControlConfiguration;
+	}
+
+	public void setCacheControlConfiguration(CacheControlConfiguration cacheControlConfiguration) {
+		this.cacheControlConfiguration = cacheControlConfiguration;
+	}
+
 	@Override
 	@SuppressWarnings("unchecked")
 	public AnthropicChatOptions copy() {
@@ -299,14 +301,221 @@ public class AnthropicChatOptions implements ToolCallingChatOptions {
 				&& Objects.equals(this.internalToolExecutionEnabled, that.internalToolExecutionEnabled)
 				&& Objects.equals(this.toolContext, that.toolContext)
 				&& Objects.equals(this.httpHeaders, that.httpHeaders)
-				&& Objects.equals(this.cacheControl, that.cacheControl);
+				&& Objects.equals(this.cacheControlConfiguration, that.cacheControlConfiguration);
 	}
 
 	@Override
 	public int hashCode() {
 		return Objects.hash(this.model, this.maxTokens, this.metadata, this.stopSequences, this.temperature, this.topP,
 				this.topK, this.thinking, this.toolCallbacks, this.toolNames, this.internalToolExecutionEnabled,
-				this.toolContext, this.httpHeaders, this.cacheControl);
+				this.toolContext, this.httpHeaders, this.cacheControlConfiguration);
+	}
+
+	public static class CacheControlConfiguration {
+
+		/**
+		 * The Anthropic API allows a maximum of 4 cache blocks. By default, we will
+		 * attempt to cache up to 4 blocks.
+		 */
+		private static final int DEFAULT_MAX_CACHE_BLOCKS = 4;
+
+		/**
+		 * The minimum text or content length for a message to be considered for caching.
+		 * By default, we will only cache messages with at least 2000 characters -
+		 * counting characters as a lightweight way to roughly estimate tokens. This helps
+		 * to avoid caching very short messages that are unlikely to benefit from caching.
+		 * Note: The Anthropic API has a minimum cacheable message length of 1024 tokens.
+		 * <a href=
+		 * "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#cache-limitations">See
+		 * here</href>
+		 */
+		private static final int DEFAULT_MIN_CACHE_BLOCK_LENGTH = 2000;
+
+		/**
+		 * The default set of message types that are considered for caching. By default,
+		 * we will cache system, user, assistant, and tool messages.
+		 */
+		private static final Set<MessageType> DEFAULT_CACHABLE_MESSAGE_TYPES = Set.of(MessageType.SYSTEM,
+				MessageType.USER, MessageType.ASSISTANT, MessageType.TOOL);
+
+		/**
+		 * The default cache types to use for each message type. By default, we will use
+		 * EPHEMERAL_1H for system messages and EPHEMERAL for user, assistant, and tool
+		 * messages. See <a href=
+		 * "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#1-hour-cache-duration">here</a>
+		 */
+		private static final Map<MessageType, AnthropicCacheType> DEFAULT_MESSAGE_TYPE_CACHE_TYPES = Map.of(
+				MessageType.SYSTEM, AnthropicCacheType.EPHEMERAL_1H, MessageType.USER, AnthropicCacheType.EPHEMERAL,
+				MessageType.ASSISTANT, AnthropicCacheType.EPHEMERAL, MessageType.TOOL, AnthropicCacheType.EPHEMERAL);
+
+		private int maxCacheBlocks = DEFAULT_MAX_CACHE_BLOCKS;
+
+		private int minCacheBlockLength = DEFAULT_MIN_CACHE_BLOCK_LENGTH;
+
+		private Set<MessageType> cachableMessageTypes = new HashSet<>(DEFAULT_CACHABLE_MESSAGE_TYPES);
+
+		private Map<MessageType, AnthropicCacheType> messageTypeCacheTypes = new HashMap<>(
+				DEFAULT_MESSAGE_TYPE_CACHE_TYPES);
+
+		/**
+		 * To enable specific minimum block lengths per message type, use this map to
+		 * override the default {@link #minCacheBlockLength} for specific message types.
+		 * For example, you might want to set a higher minimum length for system messages
+		 * and a lower minimum length for user messages.
+		 */
+		private Map<MessageType, Integer> messageTypeMinBlockLength = new HashMap<>();
+
+		public static CacheControlConfiguration DEFAULT = new CacheControlConfiguration();
+
+		public static Builder builder() {
+			return new Builder();
+		}
+
+		public int getMaxCacheBlocks() {
+			return this.maxCacheBlocks;
+		}
+
+		public void setMaxCacheBlocks(int maxCacheBlocks) {
+			this.maxCacheBlocks = maxCacheBlocks;
+		}
+
+		public int getMinCacheBlockLength() {
+			return this.minCacheBlockLength;
+		}
+
+		public void setMinCacheBlockLength(int minCacheBlockLength) {
+			this.minCacheBlockLength = minCacheBlockLength;
+		}
+
+		public Set<MessageType> getCachableMessageTypes() {
+			return this.cachableMessageTypes;
+		}
+
+		public void setCachableMessageTypes(Set<MessageType> cachableMessageTypes) {
+			this.cachableMessageTypes = cachableMessageTypes;
+		}
+
+		public Map<MessageType, AnthropicCacheType> getMessageTypeCacheTypes() {
+			return this.messageTypeCacheTypes;
+		}
+
+		public void setMessageTypeCacheTypes(Map<MessageType, AnthropicCacheType> messageTypeCacheTypes) {
+			this.messageTypeCacheTypes = messageTypeCacheTypes;
+		}
+
+		public Map<MessageType, Integer> getMessageTypeMinBlockLength() {
+			return this.messageTypeMinBlockLength;
+		}
+
+		public void setMessageTypeMinBlockLength(Map<MessageType, Integer> messageTypeMinBlockLength) {
+			this.messageTypeMinBlockLength = messageTypeMinBlockLength;
+		}
+
+		/**
+		 * Get the cache type for a given message type. If the message type is not
+		 * configured, return EPHEMERAL as the default.
+		 * @param messageType the message type
+		 * @return the cache type for the message type
+		 */
+		public AnthropicCacheType getCacheTypeForMessageType(MessageType messageType) {
+			return this.messageTypeCacheTypes.getOrDefault(messageType, AnthropicCacheType.EPHEMERAL);
+		}
+
+		/**
+		 * Get the minimum block length for a given message type. If the message type is
+		 * not configured, return the default minimum block length.
+		 * @param messageType
+		 * @return the minimum block length for the message type
+		 */
+		public Integer getMinBlockLengthForMessageType(MessageType messageType) {
+			return this.messageTypeMinBlockLength.getOrDefault(messageType, this.minCacheBlockLength);
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) {
+				return true;
+			}
+			if (!(o instanceof CacheControlConfiguration that)) {
+				return false;
+			}
+			return this.maxCacheBlocks == that.maxCacheBlocks && this.minCacheBlockLength == that.minCacheBlockLength
+					&& Objects.equals(this.cachableMessageTypes, that.cachableMessageTypes)
+					&& Objects.equals(this.messageTypeCacheTypes, that.messageTypeCacheTypes)
+					&& Objects.equals(this.messageTypeMinBlockLength, that.messageTypeMinBlockLength);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(this.maxCacheBlocks, this.minCacheBlockLength, this.cachableMessageTypes,
+					this.messageTypeCacheTypes, this.messageTypeMinBlockLength);
+		}
+
+		@Override
+		public String toString() {
+			return "CacheControlConfiguration{" + "maxCacheBlocks=" + this.maxCacheBlocks + ", minCacheBlockLength="
+					+ this.minCacheBlockLength + ", cachableMessageTypes=" + this.cachableMessageTypes
+					+ ", messageTypeCacheTypes=" + this.messageTypeCacheTypes + ", messageTypeMinBlockLength="
+					+ this.messageTypeMinBlockLength + '}';
+		}
+
+		public static class Builder {
+
+			private final CacheControlConfiguration configuration = new CacheControlConfiguration();
+
+			public Builder() {
+			}
+
+			public Builder maxCacheBlocks(int maxCacheBlocks) {
+				this.configuration.setMaxCacheBlocks(maxCacheBlocks);
+				return this;
+			}
+
+			public Builder minCacheBlockLength(int minCacheBlockLength) {
+				this.configuration.setMinCacheBlockLength(minCacheBlockLength);
+				return this;
+			}
+
+			public Builder cachableMessageTypes(Set<MessageType> cachableMessageTypes) {
+				this.configuration.setCachableMessageTypes(cachableMessageTypes);
+				return this;
+			}
+
+			public Builder messageTypeCacheTypes(Map<MessageType, AnthropicCacheType> messageTypeCacheTypes) {
+				this.configuration.setMessageTypeCacheTypes(messageTypeCacheTypes);
+				return this;
+			}
+
+			public Builder addCachableMessageType(MessageType messageType) {
+				if (this.configuration.getCachableMessageTypes() == null) {
+					this.configuration.setCachableMessageTypes(new HashSet<>());
+				}
+				this.configuration.getCachableMessageTypes().add(messageType);
+				return this;
+			}
+
+			public Builder addMessageTypeCacheType(MessageType messageType, AnthropicCacheType cacheType) {
+				if (this.configuration.getMessageTypeCacheTypes() == null) {
+					this.configuration.setMessageTypeCacheTypes(new HashMap<>());
+				}
+				this.configuration.getMessageTypeCacheTypes().put(messageType, cacheType);
+				return this;
+			}
+
+			public Builder minBlockLengthForMessageType(MessageType messageType, Integer minBlockLength) {
+				if (this.configuration.messageTypeMinBlockLength == null) {
+					this.configuration.messageTypeMinBlockLength = new HashMap<>();
+				}
+				this.configuration.messageTypeMinBlockLength.put(messageType, minBlockLength);
+				return this;
+			}
+
+			public CacheControlConfiguration build() {
+				return this.configuration;
+			}
+
+		}
+
 	}
 
 	public static class Builder {
@@ -406,11 +615,8 @@ public class AnthropicChatOptions implements ToolCallingChatOptions {
 			return this;
 		}
 
-		/**
-		 * Set cache control for user messages
-		 */
-		public Builder cacheControl(ChatCompletionRequest.CacheControl cacheControl) {
-			this.options.cacheControl = cacheControl;
+		public Builder cacheControlConfiguration(CacheControlConfiguration cacheControlConfiguration) {
+			this.options.cacheControlConfiguration = cacheControlConfiguration;
 			return this;
 		}
 
