@@ -497,6 +497,17 @@ class BedrockProxyChatModelIT {
 		// Verify no cache write on second request (reusing existing cache)
 		Integer cacheWrite2 = response2.getMetadata().get("cacheWriteInputTokens");
 		assertThat(cacheWrite2).as("Second request should not write new tokens to cache").isIn(null, 0);
+
+		// Verify unified Usage interface reports the same cache metrics
+		org.springframework.ai.chat.metadata.Usage springUsage1 = response1.getMetadata().getUsage();
+		assertThat(springUsage1.getCacheWriteInputTokens())
+			.as("Usage interface should report same cache write tokens as metadata")
+			.isEqualTo(cacheWrite1.longValue());
+
+		org.springframework.ai.chat.metadata.Usage springUsage2 = response2.getMetadata().getUsage();
+		assertThat(springUsage2.getCacheReadInputTokens())
+			.as("Usage interface should report same cache read tokens as metadata")
+			.isEqualTo(cacheRead2.longValue());
 	}
 
 	@Test
