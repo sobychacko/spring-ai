@@ -77,6 +77,18 @@ public interface ChatOptions extends ModelOptions {
 	@Nullable Double getTopP();
 
 	/**
+	 * Returns the prompt cache options for this request, if any. Providers that support
+	 * explicit cache control (e.g., Anthropic, AWS Bedrock) will translate these portable
+	 * options to their native cache mechanisms. Provider-specific cache options take
+	 * precedence when both are set.
+	 * @return the prompt cache options, or {@code null} if not configured
+	 * @since 2.0.0
+	 */
+	default @Nullable PromptCacheOptions getPromptCacheOptions() {
+		return null;
+	}
+
+	/**
 	 * Returns a copy of this {@link ChatOptions}.
 	 * @return a copy of this {@link ChatOptions}
 	 */
@@ -170,6 +182,17 @@ public interface ChatOptions extends ModelOptions {
 		 * @return the builder.
 		 */
 		B topP(@Nullable Double topP);
+
+		/**
+		 * Builds with the prompt cache options to use for the chat.
+		 * @param promptCacheOptions the prompt cache options
+		 * @return the builder.
+		 * @since 2.0.0
+		 */
+		@SuppressWarnings("unchecked")
+		default B promptCacheOptions(@Nullable PromptCacheOptions promptCacheOptions) {
+			return (B) this;
+		}
 
 		/**
 		 * Build the {@link ChatOptions}.

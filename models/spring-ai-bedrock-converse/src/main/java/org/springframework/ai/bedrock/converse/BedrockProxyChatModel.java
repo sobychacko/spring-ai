@@ -102,6 +102,7 @@ import org.springframework.ai.chat.observation.ChatModelObservationDocumentation
 import org.springframework.ai.chat.observation.DefaultChatModelObservationConvention;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.PromptCacheOptions;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.model.ModelOptionsUtils;
 import org.springframework.ai.model.tool.DefaultToolExecutionEligibilityPredicate;
@@ -331,9 +332,46 @@ public class BedrockProxyChatModel implements ChatModel {
 				.build();
 		}
 
+		// Bridge framework-level cache options to provider-specific options.
+		// Applied before provider-specific override so that BedrockCacheOptions
+		// set directly on the prompt take precedence.
+		if (prompt.getOptions() != null && prompt.getOptions().getPromptCacheOptions() != null
+				&& !prompt.getOptions().getPromptCacheOptions().isDisabled()) {
+			updatedRuntimeOptions
+				.setCacheOptions(mapToBedrockCacheOptions(prompt.getOptions().getPromptCacheOptions()));
+		}
+
+		// Override with provider-specific cache options if explicitly set
+		if (prompt.getOptions() instanceof BedrockChatOptions originalBedrockOptions
+				&& originalBedrockOptions.getCacheOptions() != null
+				&& originalBedrockOptions.getCacheOptions().getStrategy() != BedrockCacheStrategy.NONE) {
+			updatedRuntimeOptions.setCacheOptions(originalBedrockOptions.getCacheOptions());
+		}
+
 		ToolCallingChatOptions.validateToolCallbacks(updatedRuntimeOptions.getToolCallbacks());
 
 		return new Prompt(prompt.getInstructions(), updatedRuntimeOptions);
+	}
+
+	/**
+	 * Maps portable {@link PromptCacheOptions} to provider-specific
+	 * {@link BedrockCacheOptions}.
+	 */
+	private BedrockCacheOptions mapToBedrockCacheOptions(PromptCacheOptions coreOptions) {
+		BedrockCacheStrategy strategy = switch (coreOptions.getStrategy()) {
+			case NONE -> BedrockCacheStrategy.NONE;
+			case SYSTEM_ONLY -> BedrockCacheStrategy.SYSTEM_ONLY;
+			case TOOLS_ONLY -> BedrockCacheStrategy.TOOLS_ONLY;
+			case SYSTEM_AND_TOOLS -> BedrockCacheStrategy.SYSTEM_AND_TOOLS;
+			case CONVERSATION_HISTORY -> BedrockCacheStrategy.CONVERSATION_HISTORY;
+		};
+
+		if (coreOptions.getTtl() != null) {
+			logger.debug("Bedrock uses a fixed 5-minute cache TTL. The configured TTL ({}) will be ignored.",
+					coreOptions.getTtl());
+		}
+
+		return BedrockCacheOptions.builder().strategy(strategy).build();
 	}
 
 	ConverseRequest createRequest(Prompt prompt) {

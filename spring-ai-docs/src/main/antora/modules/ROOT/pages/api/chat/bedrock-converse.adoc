@@ -208,6 +208,33 @@ ChatResponse response = chatModel.call(
 );
 ----
 
+==== Portable Cache Options
+
+You can also configure prompt caching using the framework-level `PromptCacheOptions`, which works across providers that support explicit cache control (e.g., Anthropic, AWS Bedrock):
+
+[source,java]
+----
+ChatResponse response = chatModel.call(
+    new Prompt(
+        List.of(
+            new SystemMessage("You are a helpful AI assistant with extensive knowledge..."),
+            new UserMessage("What is machine learning?")
+        ),
+        BedrockChatOptions.builder()
+            .model("us.anthropic.claude-haiku-4-5-20251001-v1:0")
+            .promptCacheOptions(PromptCacheOptions.builder()
+                .strategy(PromptCacheStrategy.SYSTEM_ONLY)
+                .build())
+            .maxTokens(500)
+            .build()
+    )
+);
+----
+
+The portable `PromptCacheStrategy` values map directly to `BedrockCacheStrategy`. When both `cacheOptions` (Bedrock-specific) and `promptCacheOptions` (portable) are set, the Bedrock-specific options take precedence.
+
+NOTE: The `PromptCacheOptions.ttl` setting is ignored for Bedrock, which uses a fixed 5-minute cache TTL.
+
 ==== Tools-Only Caching
 
 Cache large tool definitions while keeping system prompts dynamic (Claude models only):

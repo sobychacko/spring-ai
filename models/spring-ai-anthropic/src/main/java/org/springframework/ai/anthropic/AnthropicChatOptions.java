@@ -45,6 +45,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.PromptCacheOptions;
 import org.springframework.ai.model.tool.DefaultToolCallingChatOptions;
 import org.springframework.ai.model.tool.StructuredOutputChatOptions;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
@@ -186,6 +187,9 @@ public class AnthropicChatOptions extends AbstractAnthropicOptions
 	 */
 	@JsonIgnore
 	private @Nullable AnthropicSkillContainer skillContainer;
+
+	@JsonIgnore
+	private @Nullable PromptCacheOptions promptCacheOptions;
 
 	private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
@@ -385,6 +389,11 @@ public class AnthropicChatOptions extends AbstractAnthropicOptions
 	}
 
 	@Override
+	public @Nullable PromptCacheOptions getPromptCacheOptions() {
+		return this.promptCacheOptions;
+	}
+
+	@Override
 	@JsonIgnore
 	public @Nullable String getOutputSchema() {
 		if (this.outputConfig == null) {
@@ -518,7 +527,8 @@ public class AnthropicChatOptions extends AbstractAnthropicOptions
 			.cacheOptions(this.getCacheOptions())
 			.outputConfig(this.outputConfig)
 			.httpHeaders(this.getHttpHeaders())
-			.skillContainer(this.getSkillContainer());
+			.skillContainer(this.getSkillContainer())
+			.promptCacheOptions(this.getPromptCacheOptions());
 	}
 
 	@Override
@@ -919,6 +929,7 @@ public class AnthropicChatOptions extends AbstractAnthropicOptions
 			options.outputConfig = this.outputConfig;
 			options.httpHeaders = this.httpHeaders;
 			options.skillContainer = this.skillContainer;
+			options.promptCacheOptions = this.promptCacheOptions;
 			options.validateCitationConsistency();
 			return options;
 		}

@@ -40,6 +40,8 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.PromptCacheOptions;
+import org.springframework.ai.chat.prompt.PromptCacheStrategy;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -398,6 +400,37 @@ class AnthropicPromptCachingIT {
 			.isTrue();
 
 		logger.info("Multi-block - Cache creation: {}, Cache read: {}", cacheCreation, cacheRead);
+	}
+
+	@Test
+	void shouldCacheSystemMessageUsingPortableCacheOptions() {
+		String systemPrompt = loadPrompt("system-only-cache-prompt.txt");
+
+		AnthropicChatOptions options = AnthropicChatOptions.builder()
+			.model(Model.CLAUDE_SONNET_4_20250514.asString())
+			.promptCacheOptions(PromptCacheOptions.builder().strategy(PromptCacheStrategy.SYSTEM_ONLY).build())
+			.maxTokens(150)
+			.temperature(0.3)
+			.build();
+
+		ChatResponse response = this.chatModel.call(new Prompt(
+				List.of(new SystemMessage(systemPrompt), new UserMessage("What is microservices architecture?")),
+				options));
+
+		assertThat(response).isNotNull();
+		assertThat(response.getResult().getOutput().getText()).isNotEmpty();
+
+		Usage usage = getSdkUsage(response);
+		assertThat(usage).isNotNull();
+
+		long cacheCreation = usage.cacheCreationInputTokens().orElse(0L);
+		long cacheRead = usage.cacheReadInputTokens().orElse(0L);
+		assertThat(cacheCreation > 0 || cacheRead > 0)
+			.withFailMessage("Expected cache activity with portable options, but got creation=%d, read=%d",
+					cacheCreation, cacheRead)
+			.isTrue();
+
+		logger.info("Portable cache options - creation: {}, read: {}", cacheCreation, cacheRead);
 	}
 
 }

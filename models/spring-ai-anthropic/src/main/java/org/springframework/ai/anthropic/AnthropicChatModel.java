@@ -86,6 +86,7 @@ import org.springframework.ai.chat.observation.ChatModelObservationDocumentation
 import org.springframework.ai.chat.observation.DefaultChatModelObservationConvention;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.PromptCacheOptions;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.model.ModelOptionsUtils;
 import org.springframework.ai.model.tool.DefaultToolExecutionEligibilityPredicate;
@@ -621,10 +622,6 @@ public final class AnthropicChatModel implements ChatModel, StreamingChatModel {
 					requestOptions
 						.setCitationDocuments(new ArrayList<>(originalAnthropicOptions.getCitationDocuments()));
 				}
-				if (originalAnthropicOptions.getCacheOptions() != null
-						&& originalAnthropicOptions.getCacheOptions().getStrategy() != AnthropicCacheStrategy.NONE) {
-					requestOptions.setCacheOptions(originalAnthropicOptions.getCacheOptions());
-				}
 				if (originalAnthropicOptions.getOutputConfig() != null) {
 					requestOptions.setOutputConfig(originalAnthropicOptions.getOutputConfig());
 				}
@@ -637,9 +634,52 @@ public final class AnthropicChatModel implements ChatModel, StreamingChatModel {
 			}
 		}
 
+		// Bridge framework-level cache options to provider-specific options.
+		// Applied before provider-specific override so that AnthropicCacheOptions
+		// set directly on the prompt take precedence.
+		if (prompt.getOptions() != null && prompt.getOptions().getPromptCacheOptions() != null
+				&& !prompt.getOptions().getPromptCacheOptions().isDisabled()) {
+			requestOptions.setCacheOptions(mapToAnthropicCacheOptions(prompt.getOptions().getPromptCacheOptions()));
+		}
+
+		// Override with provider-specific cache options if explicitly set
+		if (prompt.getOptions() instanceof AnthropicChatOptions originalAnthropicOptions
+				&& originalAnthropicOptions.getCacheOptions() != null
+				&& originalAnthropicOptions.getCacheOptions().getStrategy() != AnthropicCacheStrategy.NONE) {
+			requestOptions.setCacheOptions(originalAnthropicOptions.getCacheOptions());
+		}
+
 		ToolCallingChatOptions.validateToolCallbacks(requestOptions.getToolCallbacks());
 
 		return new Prompt(prompt.getInstructions(), requestOptions);
+	}
+
+	/**
+	 * Maps portable {@link PromptCacheOptions} to provider-specific
+	 * {@link AnthropicCacheOptions}.
+	 */
+	private AnthropicCacheOptions mapToAnthropicCacheOptions(PromptCacheOptions coreOptions) {
+		AnthropicCacheStrategy strategy = switch (coreOptions.getStrategy()) {
+			case NONE -> AnthropicCacheStrategy.NONE;
+			case SYSTEM_ONLY -> AnthropicCacheStrategy.SYSTEM_ONLY;
+			case TOOLS_ONLY -> AnthropicCacheStrategy.TOOLS_ONLY;
+			case SYSTEM_AND_TOOLS -> AnthropicCacheStrategy.SYSTEM_AND_TOOLS;
+			case CONVERSATION_HISTORY -> AnthropicCacheStrategy.CONVERSATION_HISTORY;
+		};
+
+		AnthropicCacheOptions.Builder builder = AnthropicCacheOptions.builder().strategy(strategy);
+
+		if (coreOptions.getTtl() != null) {
+			AnthropicCacheTtl ttl = coreOptions.getTtl().toMinutes() > 5 ? AnthropicCacheTtl.ONE_HOUR
+					: AnthropicCacheTtl.FIVE_MINUTES;
+			builder.messageTypeTtl(MessageType.SYSTEM, ttl);
+		}
+
+		if (coreOptions.getMinContentLength() != null) {
+			builder.messageTypeMinContentLength(MessageType.SYSTEM, coreOptions.getMinContentLength());
+		}
+
+		return builder.build();
 	}
 
 	/**

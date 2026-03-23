@@ -42,6 +42,8 @@ public class DefaultChatOptionsBuilder<B extends DefaultChatOptionsBuilder<B>> i
 
 	protected @Nullable Double topP;
 
+	protected @Nullable PromptCacheOptions promptCacheOptions;
+
 	public DefaultChatOptionsBuilder() {
 	}
 
@@ -104,6 +106,12 @@ public class DefaultChatOptionsBuilder<B extends DefaultChatOptionsBuilder<B>> i
 	}
 
 	@Override
+	public B promptCacheOptions(@Nullable PromptCacheOptions promptCacheOptions) {
+		this.promptCacheOptions = promptCacheOptions;
+		return self();
+	}
+
+	@Override
 	public B combineWith(ChatOptions.Builder<?> other) {
 		if (other instanceof DefaultChatOptionsBuilder<?> that) {
 			if (that.model != null) {
@@ -129,6 +137,9 @@ public class DefaultChatOptionsBuilder<B extends DefaultChatOptionsBuilder<B>> i
 			}
 			if (that.topP != null) {
 				this.topP = that.topP;
+			}
+			if (that.promptCacheOptions != null) {
+				this.promptCacheOptions = that.promptCacheOptions;
 			}
 		}
 		return self();

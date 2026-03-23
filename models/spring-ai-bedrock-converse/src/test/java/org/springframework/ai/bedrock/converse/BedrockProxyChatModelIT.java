@@ -43,6 +43,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.model.StreamingChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.PromptCacheOptions;
+import org.springframework.ai.chat.prompt.PromptCacheStrategy;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.content.Media;
@@ -497,6 +499,62 @@ class BedrockProxyChatModelIT {
 		// Verify no cache write on second request (reusing existing cache)
 		Integer cacheWrite2 = response2.getMetadata().get("cacheWriteInputTokens");
 		assertThat(cacheWrite2).as("Second request should not write new tokens to cache").isIn(null, 0);
+	}
+
+	@Test
+	void testSystemOnlyPromptCachingWithPortableOptions() {
+		String model = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+
+		StringBuilder largeSystemPromptBuilder = new StringBuilder();
+		String basePrompt = """
+				You are an expert software architect with deep knowledge of distributed systems,
+				microservices, cloud computing, and software design patterns. Your role is to provide
+				detailed technical guidance on system architecture, design decisions, and best practices.
+
+				Key areas of expertise:
+				- Distributed systems design and architecture
+				- Microservices patterns and anti-patterns
+				- Cloud-native application development
+				- Event-driven architectures
+				- Database design and scaling strategies
+				- API design and RESTful services
+				- Security best practices
+				- Performance optimization and scalability
+
+				""";
+		for (int i = 0; i < 12; i++) {
+			largeSystemPromptBuilder.append(basePrompt);
+		}
+		largeSystemPromptBuilder.append("When answering questions, provide clear, structured responses with examples.");
+
+		String largeSystemPrompt = largeSystemPromptBuilder.toString();
+
+		BedrockChatOptions chatOptions = BedrockChatOptions.builder()
+			.model(model)
+			.promptCacheOptions(PromptCacheOptions.builder().strategy(PromptCacheStrategy.SYSTEM_ONLY).build())
+			.maxTokens(500)
+			.build();
+
+		// First request - should create cache
+		ChatResponse response1 = this.chatModel.call(new Prompt(
+				List.of(new SystemMessage(largeSystemPrompt), new UserMessage("What is a monolith?")), chatOptions));
+
+		assertThat(response1.getResults()).hasSize(1);
+		assertThat(response1.getResult().getOutput().getText()).isNotEmpty();
+
+		Integer cacheWrite1 = response1.getMetadata().get("cacheWriteInputTokens");
+		logger.info("Portable options - cacheWriteInputTokens: {}", cacheWrite1);
+		assertThat(cacheWrite1).as("First request should write tokens to cache").isNotNull().isPositive();
+
+		// Second request - should hit cache
+		ChatResponse response2 = this.chatModel
+			.call(new Prompt(List.of(new SystemMessage(largeSystemPrompt), new UserMessage("What is a microservice?")),
+					chatOptions));
+
+		assertThat(response2.getResults()).hasSize(1);
+		Integer cacheRead2 = response2.getMetadata().get("cacheReadInputTokens");
+		logger.info("Portable options - cacheReadInputTokens: {}", cacheRead2);
+		assertThat(cacheRead2).as("Second request should read tokens from cache").isNotNull().isPositive();
 	}
 
 	@Test

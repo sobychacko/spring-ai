@@ -31,6 +31,7 @@ import org.jspecify.annotations.Nullable;
 
 import org.springframework.ai.bedrock.converse.api.BedrockCacheOptions;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.PromptCacheOptions;
 import org.springframework.ai.model.tool.DefaultToolCallingChatOptions;
 import org.springframework.ai.model.tool.StructuredOutputChatOptions;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
@@ -86,6 +87,9 @@ public class BedrockChatOptions implements ToolCallingChatOptions, StructuredOut
 
 	@JsonIgnore
 	private BedrockCacheOptions cacheOptions;
+
+	@JsonIgnore
+	private @Nullable PromptCacheOptions promptCacheOptions;
 
 	@JsonIgnore
 	private String outputSchema;
@@ -267,6 +271,11 @@ public class BedrockChatOptions implements ToolCallingChatOptions, StructuredOut
 	}
 
 	@Override
+	public @Nullable PromptCacheOptions getPromptCacheOptions() {
+		return this.promptCacheOptions;
+	}
+
+	@Override
 	public @Nullable String getOutputSchema() {
 		return this.outputSchema;
 	}
@@ -301,6 +310,7 @@ public class BedrockChatOptions implements ToolCallingChatOptions, StructuredOut
 			// Bedrock Specific
 			.requestParameters(this.requestParameters)
 			.cacheOptions(this.cacheOptions)
+			.promptCacheOptions(this.promptCacheOptions)
 			.outputSchema(this.outputSchema);
 	}
 
@@ -378,10 +388,12 @@ public class BedrockChatOptions implements ToolCallingChatOptions, StructuredOut
 
 		@Override
 		public BedrockChatOptions build() {
-			return new BedrockChatOptions(this.model, this.frequencyPenalty, this.maxTokens, this.presencePenalty,
-					this.requestParameters, this.stopSequences, this.temperature, this.topK, this.topP,
-					this.internalToolExecutionEnabled, this.toolCallbacks, this.toolNames, this.toolContext,
+			BedrockChatOptions options = new BedrockChatOptions(this.model, this.frequencyPenalty, this.maxTokens,
+					this.presencePenalty, this.requestParameters, this.stopSequences, this.temperature, this.topK,
+					this.topP, this.internalToolExecutionEnabled, this.toolCallbacks, this.toolNames, this.toolContext,
 					this.cacheOptions, this.outputSchema);
+			options.promptCacheOptions = this.promptCacheOptions;
+			return options;
 		}
 
 	}

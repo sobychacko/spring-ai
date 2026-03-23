@@ -848,6 +848,30 @@ ChatResponse response = chatModel.call(
         options));
 ----
 
+=== Portable Cache Options
+
+You can also configure prompt caching using the framework-level `PromptCacheOptions`, which works across providers that support explicit cache control (e.g., Anthropic, AWS Bedrock). This is useful when you want portable cache configuration that doesn't depend on Anthropic-specific types:
+
+[source,java]
+----
+var options = AnthropicChatOptions.builder()
+    .model("claude-sonnet-4-20250514")
+    .maxTokens(1024)
+    .promptCacheOptions(PromptCacheOptions.builder()
+        .strategy(PromptCacheStrategy.SYSTEM_ONLY)
+        .ttl(Duration.ofMinutes(5))
+        .build())
+    .build();
+
+ChatResponse response = chatModel.call(
+    new Prompt(List.of(
+        new SystemMessage("You are an expert assistant with deep domain knowledge..."),
+        new UserMessage("What is the capital of France?")),
+        options));
+----
+
+The portable `PromptCacheStrategy` values map directly to `AnthropicCacheStrategy`. When both `cacheOptions` (Anthropic-specific) and `promptCacheOptions` (portable) are set, the Anthropic-specific options take precedence.
+
 === Cache Configuration Options
 
 `AnthropicCacheOptions` provides fine-grained control over caching behavior:
