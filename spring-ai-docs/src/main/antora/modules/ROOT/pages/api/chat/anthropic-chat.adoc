@@ -1608,8 +1608,10 @@ You won't see:
 Before `2.0.0-M3` the `RestClient` based code picked up HTTP instrumentation from Spring's HTTP stack for free.
 The switch to the SDK removed that side effect.
 
-If you need HTTP-level observability today, the https://github.com/open-telemetry/opentelemetry-java-instrumentation[OpenTelemetry Java agent] is the simplest path.
-It instruments OkHttp at the JVM level, so HTTP spans, metrics, and trace propagation come back without code changes.
+For users with strict HTTP observability requirements, the SDK supports plugging in a custom HTTP client.
+See the https://platform.claude.com/docs/en/api/sdks/java#custom-http-client[Anthropic Java SDK custom HTTP client docs] for the recommended approach.
+Wire your custom-built `AnthropicClient` and `AnthropicClientAsync` into Spring AI via `AnthropicChatModel.builder().anthropicClient(...).anthropicClientAsync(...)`.
+Built-in HTTP-level observability is being explored for a future release.
 ====
 
 == Logging

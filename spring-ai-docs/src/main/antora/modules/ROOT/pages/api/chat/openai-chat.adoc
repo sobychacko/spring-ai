@@ -790,8 +790,10 @@ The switch to the SDK removed that side effect.
 This is most painful when you're behind an AI gateway or hitting an OpenAI-compatible server like vLLM or Ollama.
 Traces stop at the SDK boundary.
 
-If you need HTTP-level observability today, the https://github.com/open-telemetry/opentelemetry-java-instrumentation[OpenTelemetry Java agent] is the simplest path.
-It instruments OkHttp at the JVM level, so HTTP spans, metrics, and trace propagation come back without code changes.
+For users with strict HTTP observability requirements, the SDK supports plugging in a custom HTTP client.
+See the https://github.com/openai/openai-java#customized-okhttpclient[openai-java custom HTTP client docs] for the recommended approach.
+Wire your custom-built `OpenAIClient` and `OpenAIClientAsync` into Spring AI via `OpenAiChatModel.builder().openAiClient(...).openAiClientAsync(...)`.
+Built-in HTTP-level observability is being explored for a future release.
 ====
 
 == Using Extra Parameters with OpenAI-Compatible Servers [[openai-compatible-servers]]
